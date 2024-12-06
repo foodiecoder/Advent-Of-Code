@@ -1,107 +1,3 @@
-#=
-using Graphs
-
-function parse_input(input::String)
-    rules_str, updates_str = split(strip(input), "\n\n")
-
-    # Parse rules
-    rules = Dict{Int,Set{Int}}()
-    for rule in split(rules_str, "\n")
-        before, after = parse.(Int, split(rule, "|"))
-        if !haskey(rules, before)
-            rules[before] = Set{Int}()
-        end
-        push!(rules[before], after)
-    end
-
-    # Parse updates
-    updates = [[parse(Int, x) for x in split(update, ',')]
-               for update in split(updates_str, "\n") if !isempty(update)]
-
-    return rules, updates
-end
-
-function is_valid_order(pages::Vector{Int}, rules::Dict{Int,Set{Int}})
-    page_positions = Dict(page => i for (i, page) in enumerate(pages))
-
-    for (before, afters) in rules
-        if haskey(page_positions, before)
-            for after in afters
-                if haskey(page_positions, after)
-                    if page_positions[before] > page_positions[after]
-                        return false
-                    end
-                end
-            end
-        end
-    end
-    return true
-end
-
-function part1(input::String)
-    rules, updates = parse_input(input)
-    result = 0
-
-    for update in updates
-        if is_valid_order(update, rules)
-            middle_idx = div(length(update), 2) + 1
-            result += update[middle_idx]
-        end
-    end
-
-    return result
-end
-
-function create_graph(pages::Set{Int}, rules::Dict{Int,Set{Int}})
-    n = maximum(pages)
-    g = SimpleDiGraph(n)
-
-    for (before, afters) in rules
-        if before in pages
-            for after in afters
-                if after in pages
-                    add_edge!(g, before, after)
-                end
-            end
-        end
-    end
-
-    return g
-end
-
-function part2(input::String)
-    rules, updates = parse_input(input)
-    result = 0
-
-    for update in updates
-        if !is_valid_order(update, rules)
-            pages = Set(update)
-            g = create_graph(pages, rules)
-            ordered = topological_sort(g)
-
-            # Filter ordered to only include pages from the update
-            ordered = filter(x -> x in pages, ordered)
-
-            if length(ordered) == length(pages)
-                middle_idx = div(length(ordered), 2) + 1
-                result += ordered[middle_idx]
-            end
-        end
-    end
-
-    return result
-end
-
-# Main execution
-function main(file_path::String)
-    input = read(file_path, String)
-    println("Part 1: ", part1(input))
-    println("Part 2: ", part2(input))
-end
-
-@time main("2024/data/input5.txt") # 0.008185 seconds (58.81 k allocations: 5.249 MiB)
-=#
-
 using Graphs
 using Test
 
@@ -167,7 +63,7 @@ function main(file_path::String)
     println("Task 2: Sum of middle page numbers for invalid updates after ordering = $invalid_sum")
 end
 
-@time main("2024/data/input5.txt") # 0.003331 seconds (48.89 k allocations: 4.575 MiB)
+# 0.003331 seconds (48.89 k allocations: 4.575 MiB)
 
 # Tests
 function run_tests()
