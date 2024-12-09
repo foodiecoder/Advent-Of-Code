@@ -1,92 +1,80 @@
-using DataStructures
+using StaticArrays
 using Test
 
-struct Point
-    x::Int
-    y::Int
-end
+const Point = SVector{2,Int}
 
-Base.:+(p1::Point, p2::Point) = Point(p1.x + p2.x, p1.y + p2.y)
-Base.:-(p1::Point, p2::Point) = Point(p1.x - p2.x, p1.y - p2.y)
-
-mutable struct SpatialIndex
-    grid::Dict{Tuple{Int,Int},Char}
+struct SpatialIndex
+    grid::BitMatrix
     bounds::Tuple{Int,Int}
 end
 
+# Constructor
 function SpatialIndex()
-    SpatialIndex(Dict{Tuple{Int,Int},Char}(), (0, 0))
+    SpatialIndex(BitMatrix(undef, 0, 0), (0, 0))
 end
 
 function is_valid_position(index::SpatialIndex, p::Point)
-    1 ≤ p.x ≤ index.bounds[1] && 1 ≤ p.y ≤ index.bounds[2]
+    1 ≤ p[1] ≤ index.bounds[1] && 1 ≤ p[2] ≤ index.bounds[2]
 end
 
 function mark_antinode!(index::SpatialIndex, p::Point)
     if is_valid_position(index, p)
-        index.grid[(p.x, p.y)] = '#'
+        @inbounds index.grid[p[1], p[2]] = true
     end
 end
 
-# Stream process input file and collect antenna positions
 function read_antenna_positions(filepath::String)
-    antenna_dict = DefaultDict{Char,Vector{Point}}(() -> Point[])
-    rows = 0
-    cols = 0
+    antenna_dict = Dict{Char,Vector{Point}}()
+    lines = readlines(filepath)
+    rows, cols = length(lines), length(first(lines))
 
-    open(filepath, "r") do file
-        for (row, line) in enumerate(eachline(file))
-            rows = row
-            cols = length(line)
-            for (col, char) in enumerate(line)
-                if isletter(char) || isdigit(char)
-                    push!(antenna_dict[char], Point(row, col))
-                end
+    for (row, line) in enumerate(lines)
+        for (col, char) in enumerate(line)
+            if isletter(char) || isdigit(char)
+                points = get!(Vector{Point}, antenna_dict, char)
+                push!(points, Point(row, col))
             end
         end
     end
 
-    return Dict(antenna_dict), (rows, cols)
+    return antenna_dict, (rows, cols)
 end
 
-# Process antenna pairs and mark antinodes
 function process_antenna_pairs!(spatial_index::SpatialIndex, antenna_positions::Dict, task::Int)
     if task == 2
-        for (char, positions) in antenna_positions
-            if length(positions) > 1
-                for pos in positions
-                    mark_antinode!(spatial_index, pos)
-                end
-                for i in eachindex(positions)
-                    for j in 1:i-1
-                        pos1 = positions[i]
-                        pos2 = positions[j]
-                        dp = pos2 - pos1
+        for (_, positions) in antenna_positions
+            len = length(positions)
+            len < 2 && continue
 
-                        n1 = pos2
-                        n2 = pos1
+            @inbounds for i in 1:len
+                mark_antinode!(spatial_index, positions[i])
+                for j in 1:i-1
+                    pos1, pos2 = positions[i], positions[j]
+                    dp = pos2 - pos1
 
-                        while is_valid_position(spatial_index, n1)
-                            mark_antinode!(spatial_index, n1)
-                            n1 = n1 + dp
-                        end
-
-                        while is_valid_position(spatial_index, n2)
-                            mark_antinode!(spatial_index, n2)
-                            n2 = n2 - dp
-                        end
+                    n1, n2 = pos2, pos1
+                    while is_valid_position(spatial_index, n1)
+                        mark_antinode!(spatial_index, n1)
+                        n1 = n1 + dp
+                    end
+                    while is_valid_position(spatial_index, n2)
+                        mark_antinode!(spatial_index, n2)
+                        n2 = n2 - dp
                     end
                 end
             end
         end
     else
-        for (char, positions) in antenna_positions
-            for i in eachindex(positions)
+        for (_, positions) in antenna_positions
+            len = length(positions)
+            len < 2 && continue
+
+            @inbounds for i in 1:len
                 for j in 1:i-1
-                    antinodes = [positions[j] + (positions[j] - positions[i]), positions[i] - (positions[j] - positions[i])]
-                    for antinode in antinodes
-                        mark_antinode!(spatial_index, antinode)
-                    end
+                    pos1, pos2 = positions[i], positions[j]
+                    diff = pos2 - pos1
+                    mark_antinode!(spatial_index, pos2 + diff)
+                    mark_antinode!(spatial_index, pos1 - diff)
                 end
             end
         end
@@ -94,11 +82,10 @@ function process_antenna_pairs!(spatial_index::SpatialIndex, antenna_positions::
 end
 
 function count_antinodes(filepath::String, task::Int)
-    spatial_index = SpatialIndex()
     antenna_positions, bounds = read_antenna_positions(filepath)
-    spatial_index.bounds = bounds
+    spatial_index = SpatialIndex(falses(bounds...), bounds)
     process_antenna_pairs!(spatial_index, antenna_positions, task)
-    return count(v -> v == '#', values(spatial_index.grid))
+    return count(spatial_index.grid)
 end
 
 function run_tests()
@@ -164,8 +151,7 @@ function main(file_path::String)
     println("Task2: total unique antinodes: ", count_antinodes(file_path, 2))
 end
 
-#0.000899 seconds (813 allocations: 207.312 KiB)
-
+# 0.000557 seconds (520 allocations: 46.969 KiB)
 if abspath(PROGRAM_FILE) == @__FILE__
     isempty(ARGS) && error("Provide an input file path or 'test' as argument")
     if ARGS[1] == "test"
@@ -175,3 +161,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         main(ARGS[1])
     end
 end
+
+#=
+`BitMatrix` >. instead of Dict for grid storage
+`StaticArrays` >. Point type
+`Dict` >. preallocate for alphabet letters(26)
+`enumerate()` >. file reading not with enumerate(eachline(file))
+`readlines` >. reading entire file at once
+`@inbound` >. array access
+=#
