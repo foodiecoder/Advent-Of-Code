@@ -1,58 +1,4 @@
-#=
-function solve_claw(input::AbstractString)
-    total = 0
-    for line in eachsplit(input, "\n\n")
-        a_x, a_y = parse.(Int, match(r"A: X\+(\d+), Y\+(\d+)", line).captures)
-        b_x, b_y = parse.(Int, match(r"B: X\+(\d+), Y\+(\d+)", line).captures)
-        p_x, p_y = parse.(Int, match(r"Prize: X=(\d+), Y=(\d+)", line).captures)
-
-        min_tokens = typemax(Int)
-        for a = 0:100
-            x_rem, y_rem = p_x - a * a_x, p_y - a * a_y
-            b = x_rem ÷ b_x
-            if 0 ≤ b ≤ 100 && x_rem % b_x == 0 && y_rem == b * b_y
-                min_tokens = min(min_tokens, 3a + b)
-            end
-        end
-        min_tokens < typemax(Int) && (total += min_tokens)
-    end
-    total
-end
-
-function run_tests()
-    test_input = """Button A: X+94, Y+34
-Button B: X+22, Y+67
-Prize: X=8400, Y=5400
-
-Button A: X+26, Y+66
-Button B: X+67, Y+21
-Prize: X=12748, Y=12176
-
-Button A: X+17, Y+86
-Button B: X+84, Y+37
-Prize: X=7870, Y=6450
-
-Button A: X+69, Y+23
-Button B: X+27, Y+71
-Prize: X=18641, Y=10279"""
-
-    @assert solve_claw(test_input) == 480 "Test failed!"
-end
-
-run_tests()
-
-
-function main(file_path::String)
-    @time begin
-        input = read(file_path, String)
-        println("Solution: ", solve_claw(input))
-    end
-end
-
-main("2024/data/input13.txt")
-=#
 # Reference: https://www.reddit.com/r/adventofcode/comments/1hd4wda/comment/m1tqn1k/
-
 using JuMP
 using HiGHS
 using Test
@@ -160,9 +106,6 @@ function run_tests()
         end
     end
 end
-
-run_tests()
-main("2024/data/input13.txt");# 0.929598 seconds (1.63 M allocations: 39.557 MiB, 0.47% gc time)
 
 if abspath(PROGRAM_FILE) == @__FILE__
     isempty(ARGS) && error("Provide an input file path or 'test' as argument")
