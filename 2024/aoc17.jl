@@ -108,8 +108,8 @@ function main(filename::String)
         part1, program, registers = process_input(filename)
         println("Part 1 : ", part1)
 
-        initial_A = find_initial_A(program)
-        println("Part 2 : ", initial_A)
+        part2 = find_initial_A(program)
+        println("Part 2 : ", part2)
     end
 end
 
